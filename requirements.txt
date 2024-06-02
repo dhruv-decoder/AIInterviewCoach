@@ -34,3 +34,4 @@ python-dotenv
 pytz
 requests
 streamlit
+libgl1-mesa-glx
