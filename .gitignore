@@ -1,0 +1,11 @@
+venv/
+.vscode/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+# Output files (optional, if you don't want to track them)
+output/
+*.mp3
+*.mp4
+*.jpg
