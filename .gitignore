@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 .DS_Store
 .env
+.streamlit/secrets.toml
 # Output files (optional, if you don't want to track them)
 output/
 *.mp3

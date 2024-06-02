@@ -1,5 +1,5 @@
 import os
-from dotenv import load_dotenv
+import streamlit as st
 import openai
 import requests
 from PIL import Image
@@ -11,11 +11,8 @@ import io
 from PIL import Image, ImageDraw, ImageFont
 import textwrap
 
-load_dotenv()
-# Get API keys from environment variables
-openai_api_key = os.getenv('OPENAI_API_KEY')
-huggingface_api_key = os.getenv('HUGGINGFACE_API_KEY')
-
+openai_api_key = st.secrets["general"]["OPENAI_API_KEY"]
+huggingface_api_key = st.secrets["general"]["HUGGINGFACE_API_KEY"]
 # Set up OpenAI API key
 openai.api_key = openai_api_key
 
