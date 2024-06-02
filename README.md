@@ -1,7 +1,7 @@
 # AllInterviewCoach
 
 AllInterviewCoach is an innovative solution designed to help students and job seekers prepare for interviews more effectively. Developed during an internship at Blockverse, this project leverages the power of artificial intelligence (AI) to generate realistic mock interview scenarios, complete with transcripts and video simulations.
-
+(/Screenshot (222).png)
 ## Table of Contents
 
 - [Features](#features)
@@ -103,6 +103,4 @@ AllInterviewCoach is an innovative solution designed to help students and job se
 
 Contributions are welcome! Please fork the repository and submit a pull request for any enhancements or bug fixes.
 
-## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
