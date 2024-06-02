@@ -24,7 +24,7 @@ multidict==6.0.5
 numpy==1.26.4
 openai==0.28.0
 opencv-python==4.9.0.80
-packaging==24.0
+packaging
 pandas==2.2.2
 Pillow==10.3.0
 proglog==0.1.10
