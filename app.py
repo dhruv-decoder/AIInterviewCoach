@@ -1,13 +1,13 @@
-import os
 import streamlit as st
 import openai
 import requests
-from PIL import Image, ImageDraw, ImageFont
-import textwrap
-import moviepy.editor as mp
-from gtts import gTTS
+from PIL import Image
 import io
 import numpy as np
+import tempfile
+import os
+import moviepy.editor as mp
+from gtts import gTTS
 
 # API keys
 openai_api_key = st.secrets["general"]["OPENAI_API_KEY"]
@@ -16,10 +16,6 @@ openai.api_key = openai_api_key
 
 def generate_interview_transcript(role, experience, additional_details, interview_type):
     model_engine = "gpt-3.5-turbo"
-
-    if role.lower() == "invalid" or experience.lower() == "invalid":
-        return "Sorry, the provided role or experience level seems invalid. Please enter a valid and realistic role and experience level."
-
     prompt = f"Generate a {interview_type} mock interview script to be used in a video for a {experience} {role} candidate. Incorporate any relevant details like candidate's name, interviewer's name, company details, etc. Keep the transcript concise and focused on the interview conversation. Additional details: {additional_details}"
 
     messages = [
@@ -37,15 +33,9 @@ def generate_interview_transcript(role, experience, additional_details, intervie
     )
 
     transcript = response.choices[0].message.content
-    with open("script.txt", "w", encoding="utf-8") as file:
-        file.write(transcript)
-
     return transcript
 
-def generate_audio(script_file='script.txt', output_file='interview_audio.mp3', lang='en'):
-    with open(script_file, 'r') as file:
-        script = file.read()
-
+def generate_audio(script, lang='en'):
     lines = script.split('\n')
     full_text = ""
     current_speaker = None
@@ -62,8 +52,11 @@ def generate_audio(script_file='script.txt', output_file='interview_audio.mp3', 
             
             full_text += text + ". "
 
-    tts = gTTS(text=full_text, lang=lang, slow=False)
-    tts.save(output_file)
+    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp:
+        audio_file = temp.name
+        tts = gTTS(text=full_text, lang=lang, slow=False)
+        tts.save(audio_file)
+    return audio_file
 
 def generate_image(prompt, api_key):
     API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
@@ -73,7 +66,7 @@ def generate_image(prompt, api_key):
         raise Exception(f"Failed to generate image: {response.status_code} - {response.text}")
     return Image.open(io.BytesIO(response.content))
 
-def create_video_with_images_and_audio(images, audio_file, script, output_video='output/interview.mp4'):
+def create_video_with_images_and_audio(images, audio_file, script, output_video):
     clips = []
     audio_clip = mp.AudioFileClip(audio_file)
     total_audio_duration = audio_clip.duration
@@ -82,13 +75,8 @@ def create_video_with_images_and_audio(images, audio_file, script, output_video=
     duration_per_clip = total_audio_duration / len(lines)
 
     for i, line in enumerate(lines):
-        speaker, text = line.split(':', 1)
-        text = text.strip()
-
-        # Choose the image based on the speaker
+        speaker, _ = line.split(':', 1)
         background = images[0] if 'Interviewer' in speaker else images[1]
-        
-        # Use the image directly without adding text
         clip = mp.ImageClip(np.array(background)).set_duration(duration_per_clip)
         clips.append(clip)
 
@@ -96,15 +84,13 @@ def create_video_with_images_and_audio(images, audio_file, script, output_video=
     final_clip = video.set_audio(audio_clip)
     final_clip.write_videofile(output_video, codec='libx264', fps=24)
 
-def create_mock_interview(role, experience, additional_details, interview_type, output_folder='output'):
-    os.makedirs(output_folder, exist_ok=True)
-
+def create_mock_interview(role, experience, additional_details, interview_type):
     transcript = generate_interview_transcript(role, experience, additional_details, interview_type)
+    yield "Generated interview transcript."
 
-    audio_file = os.path.join(output_folder, 'interview_audio.mp3')
-    generate_audio(lang='en', output_file=audio_file)
+    audio_file = generate_audio(transcript)
+    yield "Generated audio."
 
-    # Generate images for the interviewer and interviewee
     prompts = [
         "A professional interviewer in a modern office setting, clear and realistic.",
         "A confident candidate being interviewed, in a corporate environment, clear and realistic."
@@ -114,16 +100,12 @@ def create_mock_interview(role, experience, additional_details, interview_type, 
     for prompt in prompts:
         image = generate_image(prompt, huggingface_api_key)
         images.append(image)
+    yield "Generated images."
 
-    output_video = os.path.join(output_folder, 'mock_interview.mp4')
-    create_video_with_images_and_audio(images, audio_file, transcript, output_video)
-
-    yield f"Mock interview video for {experience} {role} position created at {output_video}"
-
-def generate_mock_interview_with_updates(role, experience, additional_details, interview_type):
-    yield "Generating mock interview..."
-    for update in create_mock_interview(role, experience, additional_details, interview_type, "output"):
-        yield update
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp:
+        output_video = temp.name
+        create_video_with_images_and_audio(images, audio_file, transcript, output_video)
+    yield output_video
 
 st.set_page_config(page_title="AIInterviewCoach", page_icon="🎥", layout="wide")
 
@@ -131,7 +113,6 @@ st.title("🎬 AIInterviewCoach")
 st.subheader("Generate Custom Mock Interview Videos with AI")
 st.write(""" Welcome to AIInterviewCoach! This tool uses advanced AI to create personalized mock interview videos. Perfect for practice, these videos simulate real interview scenarios tailored to your role and experience level. Get ready to ace your next interview! 🚀 """)
 
-# User Inputs
 col1, col2 = st.columns(2)
 with col1:
     role = st.text_input("🎨 Job Role (e.g., Data Analyst, UX Designer)", "Data Analyst")
@@ -140,30 +121,22 @@ with col2:
     interview_type = st.selectbox("🎭 Interview Scenario", ["Standard", "Behavioral", "Technical", "Case Study", "Successful - You're hired!"])
     additional_details = st.text_area("✨ Additional Details", "Proficient in SQL, Python, and Tableau. The company is a growing startup in the e-commerce sector.")
 
-# Create Button
 if st.button("🎥 Generate Mock Interview"):
-    progress_generator = generate_mock_interview_with_updates(role, experience, additional_details, interview_type)
-    progress_text = progress_generator.__next__()
-    with st.spinner(progress_text):
-        while True:
-            try:
-                progress_text = progress_generator.__next__()
-                st.write(progress_text)
-            except StopIteration:
-                break
-
-    video_path = os.path.join("output", "mock_interview.mp4")
-    if os.path.exists(video_path):
-        st.success("🌟 Your mock interview is ready!")
-        st.video(video_path)
-        st.download_button(
-            label="📥 Download Video",
-            data=open(video_path, 'rb').read(),
-            file_name="my_mock_interview.mp4",
-            mime="video/mp4"
-        )
-    else:
-        st.error("❌ An error occurred while generating the mock interview video.")
+    progress_generator = create_mock_interview(role, experience, additional_details, interview_type)
+    for progress_text in progress_generator:
+        if progress_text.endswith(".mp4"):
+            st.success("🌟 Your mock interview is ready!")
+            st.video(progress_text)
+            with open(progress_text, 'rb') as f:
+                st.download_button(
+                    label="📥 Download Video",
+                    data=f,
+                    file_name="my_mock_interview.mp4",
+                    mime="video/mp4"
+                )
+            os.unlink(progress_text)  # Delete the temporary file
+        else:
+            st.write(progress_text)
 
 st.sidebar.title("🚀 About AIInterviewCoach")
 st.sidebar.info(""" AIInterviewCoach is an innovative tool that leverages AI to create realistic mock interview videos.   🔧 Features: - Custom scenarios - Role-specific questions - AI-generated visuals - Professional voice-overs  🌈 Created by:  Dhruv Tibarewal 🔗 GitHub: dhruv-decoder """)
